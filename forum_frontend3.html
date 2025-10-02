@@ -176,8 +176,8 @@
                 return;
             }
 
-            // Sort by total upvotes
-            data.sort((a, b) => (parseInt(b['👍 TOTAL VOTES']) || 0) - (parseInt(a['👍 TOTAL VOTES']) || 0));
+            // --- CHANGE MADE HERE: Reverse the array to show the last row (newest data) first. ---
+            data.reverse();
 
             let allRowsHtml = '';
 
