@@ -3,31 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Curriculum Transparency Tracker</title>
+    <title>Curriculum Feedback Forum</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom Styles for professional aesthetic */
         body {
+            /* Using the standard professional font Inter */
             font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb; /* Very light, professional background */
+            background-color: #f0f4f8; /* Lighter, cleaner background */
         }
         .header-bg {
-            background-color: #0b1a3d; /* Deep Navy Blue */
+            background-color: #1a2b4f; /* Deep, authoritative navy blue */
         }
         
         /* The main container for the table view */
         .grid-container {
             max-height: 80vh; /* Limit height for scrolling */
             overflow-y: auto;
-            /* Force horizontal scroll on small screens for the table layout */
-            overflow-x: auto;
-            min-width: 100%; /* Default for full width */
+            width: 100%;
         }
 
-        /* Enforce minimum width for the grid content on smaller screens to maintain column integrity */
+        /* Enforce 100% width, letting the 10-column grid be fully responsive */
         .data-grid-wrapper {
-            min-width: 900px; /* Ensures the 8 columns have space on smaller viewports */
             width: 100%;
         }
 
@@ -36,7 +34,7 @@
             /* Ensures text wraps but max-height keeps the row contained */
             max-height: 90px; 
             overflow-y: auto;
-            padding: 0.5rem;
+            padding: 0.75rem 0.5rem; /* Increased vertical padding */
             line-height: 1.4;
         }
 
@@ -46,6 +44,11 @@
             top: 0;
             z-index: 10;
         }
+        
+        /* Accent color for the voting column */
+        .voting-accent {
+            background-color: #f7f9fc; /* Very subtle grey/blue tint */
+        }
 
     </style>
 </head>
@@ -54,7 +57,7 @@
     <!-- Header Section -->
     <header class="header-bg p-6 shadow-xl">
         <div class="container mx-auto">
-            <h1 class="text-3xl font-extrabold text-white">Curriculum Transparency Tracker</h1>
+            <h1 class="text-3xl font-extrabold text-white">Curriculum Feedback Forum</h1>
             <p class="text-base text-indigo-200 mt-1">Structured oversight of student feedback and official responses.</p>
         </div>
     </header>
@@ -77,7 +80,7 @@
             Data loading...
         </div>
         
-        <!-- Data Grid Container (Will scroll horizontally on mobile) -->
+        <!-- Data Grid Container (Will fit content horizontally) -->
         <div id="data-grid-container" class="bg-white rounded-xl shadow-lg grid-container">
             <div id="initial-loading" class="text-center p-10 text-gray-500">Loading feedback data...</div>
             <!-- Data rows will be injected here -->
@@ -143,13 +146,13 @@
          */
         function createFormLink(urlFragment, feedbackId, label, tailwindClass) {
             const fullUrl = `${urlFragment}${feedbackId}`;
-            return `<a href="${fullUrl}" target="_blank" class="${tailwindClass} text-[10px] sm:text-xs font-bold transition duration-150 ease-in-out w-full text-center py-1 rounded-md shadow-sm">
+            return `<a href="${fullUrl}" target="_blank" class="${tailwindClass} text-xs sm:text-sm font-bold transition duration-150 ease-in-out w-full text-center py-1 rounded-md shadow-sm">
                         ${label}
                     </a>`;
         }
 
 
-        // --- 3. RENDERING (New Grid/Table Format) ---
+        // --- 3. RENDERING (New Grid/Table Format with 10 Columns) ---
 
         /**
          * Renders the feedback data in an Excel-like grid structure.
@@ -170,13 +173,13 @@
             let allRowsHtml = '';
 
             // --- Grid Header (Sticky Row) ---
-            // Desktop grid: 8 parts (2+3+1+2)
+            // New grid distribution (10 parts total): 2 (ID/Course) + 4 (Suggestion) + 1 (Voting) + 3 (Reply)
             const headerHtml = `
-                <div class="data-grid-wrapper grid grid-cols-8 text-xs font-semibold uppercase text-white bg-indigo-800 grid-header shadow-lg">
-                    <div class="col-span-2 p-2 pl-4 border-r border-indigo-700">Course / ID</div>
-                    <div class="col-span-3 p-2 pl-4 border-r border-indigo-700">Student Suggestion / Issue</div>
-                    <div class="col-span-1 p-2 text-center border-r border-indigo-700">Voting</div>
-                    <div class="col-span-2 p-2 pl-4">Official MSG Reply</div>
+                <div class="data-grid-wrapper grid grid-cols-10 text-xs font-semibold uppercase text-white bg-indigo-900 grid-header shadow-md">
+                    <div class="col-span-2 p-3 pl-4 border-r border-indigo-800">Course / ID</div>
+                    <div class="col-span-4 p-3 pl-4 border-r border-indigo-800">Student Suggestion / Issue</div>
+                    <div class="col-span-1 p-3 text-center border-r border-indigo-800">Voting</div>
+                    <div class="col-span-3 p-3 pl-4">Official MSG Reply</div>
                 </div>
             `;
             
@@ -204,9 +207,9 @@
 
                 const rowHtml = `
                     <!-- ROW: Grid Container -->
-                    <div class="data-grid-wrapper grid grid-cols-8 items-stretch text-sm border-b border-gray-100 hover:bg-indigo-50 transition duration-150 ease-in-out ${rowClass}">
+                    <div class="data-grid-wrapper grid grid-cols-10 items-stretch text-sm border-b border-gray-100 hover:bg-indigo-50 transition duration-150 ease-in-out ${rowClass}">
                         
-                        <!-- COLUMN 1: ID / Course (2/8 parts) -->
+                        <!-- COLUMN 1: ID / Course (2/10 parts) - Widened to ensure ID is fully visible -->
                         <div class="col-span-2 text-indigo-900 font-semibold border-r border-gray-200 flex flex-col justify-center">
                             <div class="p-2 pl-4">
                                 <span class="text-xs text-gray-500 font-normal block">ID: ${threadId}</span>
@@ -214,19 +217,19 @@
                             </div>
                         </div>
 
-                        <!-- COLUMN 2: Suggestion/Issue (3/8 parts) -->
-                        <div class="col-span-3 text-gray-700 border-r border-gray-200">
+                        <!-- COLUMN 2: Suggestion/Issue (4/10 parts) -->
+                        <div class="col-span-4 text-gray-700 border-r border-gray-200">
                             <p class="grid-cell-content whitespace-pre-wrap">${thread['Your Suggestion/Issue']}</p>
                         </div>
                         
-                        <!-- COLUMN 3: Voting Actions (1/8 part) -->
-                        <div class="col-span-1 text-gray-800 border-r border-gray-200 bg-gray-50 flex flex-col items-center justify-center p-1 space-y-1">
+                        <!-- COLUMN 3: Voting Actions (1/10 part) - Touch targets are increased via JavaScript styling -->
+                        <div class="col-span-1 text-gray-800 border-r border-gray-200 voting-accent flex flex-col items-center justify-center p-1 space-y-1">
                             ${upvoteLink}
                             ${downvoteLink}
                         </div>
                         
-                        <!-- COLUMN 4: Official Reply (2/8 parts) -->
-                        <div class="col-span-2 text-gray-800">
+                        <!-- COLUMN 4: Official Reply (3/10 parts) -->
+                        <div class="col-span-3 text-gray-800">
                             <p class="grid-cell-content italic whitespace-pre-wrap">${thread['Official MSG Reply'] || 'Awaiting review...'}</p>
                         </div>
                     </div>
