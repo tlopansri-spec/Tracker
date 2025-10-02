@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curriculum Transparency Tracker</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Styles for professional aesthetic */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb; /* Very light, professional background */
+        }
+        .header-bg {
+            background-color: #0b1a3d; /* Deep Navy Blue */
+        }
+        
+        /* The main container for the table view */
+        .grid-container {
+            max-height: 80vh; /* Limit height for scrolling */
+            overflow-y: auto;
+            /* Force horizontal scroll on small screens for the table layout */
+            overflow-x: auto;
+            min-width: 100%; /* Default for full width */
+        }
+
+        /* Enforce minimum width for the grid content on smaller screens to maintain column integrity */
+        .data-grid-wrapper {
+            min-width: 900px; /* Ensures the 8 columns have space on smaller viewports */
+            width: 100%;
+        }
+
+        /* Style for individual grid cells */
+        .grid-cell-content {
+            /* Ensures text wraps but max-height keeps the row contained */
+            max-height: 90px; 
+            overflow-y: auto;
+            padding: 0.5rem;
+            line-height: 1.4;
+        }
+
+        /* Style for the sticky header */
+        .grid-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header Section -->
+    <header class="header-bg p-6 shadow-xl">
+        <div class="container mx-auto">
+            <h1 class="text-3xl font-extrabold text-white">Curriculum Transparency Tracker</h1>
+            <p class="text-base text-indigo-200 mt-1">Structured oversight of student feedback and official responses.</p>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="container mx-auto p-4 md:p-8">
+
+        <!-- Status and Actions -->
+        <div class="flex justify-between items-center mb-4 border-b-2 border-gray-200 pb-2">
+            <h2 class="text-2xl font-semibold text-gray-800">Feedback Data Grid</h2>
+            <button onclick="fetchFeedbackData(true)" class="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh Data
+            </button>
+        </div>
+
+        <div id="status-message" class="bg-indigo-100 text-indigo-800 p-3 rounded-lg shadow-md mb-6 hidden">
+            Data loading...
+        </div>
+        
+        <!-- Data Grid Container (Will scroll horizontally on mobile) -->
+        <div id="data-grid-container" class="bg-white rounded-xl shadow-lg grid-container">
+            <div id="initial-loading" class="text-center p-10 text-gray-500">Loading feedback data...</div>
+            <!-- Data rows will be injected here -->
+        </div>
+    </main>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 1. CONFIGURATION ---
+
+        // LIVE CSV DATA URL: Your published CSV link from the '0_Filtered View' sheet
+        const LIVE_DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCwS6OqZsI806ccLnNWMPDafrhr1_cvFftnl5JmsygaC1yo54VtwY-P_SIgz7EfwWgTbF9srTeTkOx/pub?gid=72186548&single=true&output=csv";
+
+        // LIVE UPVOTE FORM URL: The isolated pre-filled fragment for Upvote submissions
+        const LIVE_UPVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScmW7ZkSbRhL94B3XlcA8hz0WVuPzqgBcgOmXwTqKXOESrT2Q/viewform?usp=pp_url&entry.467475171=";
+
+        // LIVE DOWNVOTE FORM URL: The isolated pre-filled fragment for Downvote submissions
+        const LIVE_DOWNVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfHstlcoj2_JHOYLwJo3QTE4SyrHMAhiFPVOFLpGOMrRJ6BlA/viewform?usp=pp_url&entry.786514782=";
+
+        // Maps the column headers from your QUERY (D, B, C, E, F, G, H, I) to friendly keys.
+        const COLUMN_MAP = {
+            'Feedback ID': 0,
+            'Course': 1,
+            'Your Suggestion/Issue': 2,
+            '👍 TOTAL VOTES': 3,
+            '👎 TOTAL DOWNVOTES': 4,
+            'Official MSG Reply': 5,
+            'Click to Upvote': 6,
+            'Click to Downvote': 7,
+        };
+        
+        // --- 2. DATA UTILITIES ---
+
+        /**
+         * Parses the CSV text from Google Sheets into an array of objects.
+         * @param {string} csvText - The raw CSV string.
+         * @returns {Array<Object>} - Array of feedback objects.
+         */
+        function parseCSV(csvText) {
+            const rows = csvText.trim().split('\n');
+            if (rows.length === 0) return [];
+
+            // The header row is the first row.
+            // NOTE: We rely on the fixed order defined in COLUMN_MAP since dynamic CSV headers can be complex.
+            const data = rows.slice(1).map(row => {
+                // Split by comma, handling commas inside quotes for complex strings
+                const values = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(val => val.trim().replace(/['"]+/g, ''));
+                let entry = {};
+                
+                // Map the data based on the position expected in the COLUMN_MAP
+                for (const key in COLUMN_MAP) {
+                    const index = COLUMN_MAP[key];
+                    entry[key] = values[index] || '';
+                }
+                return entry;
+            }).filter(entry => entry['Course']); // Only keep rows that have a Course listed (hides blank rows)
+            
+            return data;
+        }
+
+        /**
+         * Creates a clickable button (link) that opens the pre-filled form.
+         */
+        function createFormLink(urlFragment, feedbackId, label, tailwindClass) {
+            const fullUrl = `${urlFragment}${feedbackId}`;
+            return `<a href="${fullUrl}" target="_blank" class="${tailwindClass} text-[10px] sm:text-xs font-bold transition duration-150 ease-in-out w-full text-center py-1 rounded-md shadow-sm">
+                        ${label}
+                    </a>`;
+        }
+
+
+        // --- 3. RENDERING (New Grid/Table Format) ---
+
+        /**
+         * Renders the feedback data in an Excel-like grid structure.
+         * @param {Array<Object>} data - Array of feedback objects.
+         */
+        function renderDataGrid(data) {
+            const container = document.getElementById('data-grid-container');
+            container.innerHTML = ''; // Clear previous content
+
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 p-10">No active feedback threads found yet.</p>';
+                return;
+            }
+
+            // Sort by total upvotes
+            data.sort((a, b) => (parseInt(b['👍 TOTAL VOTES']) || 0) - (parseInt(a['👍 TOTAL VOTES']) || 0));
+
+            let allRowsHtml = '';
+
+            // --- Grid Header (Sticky Row) ---
+            // Desktop grid: 8 parts (2+3+1+2)
+            const headerHtml = `
+                <div class="data-grid-wrapper grid grid-cols-8 text-xs font-semibold uppercase text-white bg-indigo-800 grid-header shadow-lg">
+                    <div class="col-span-2 p-2 pl-4 border-r border-indigo-700">Course / ID</div>
+                    <div class="col-span-3 p-2 pl-4 border-r border-indigo-700">Student Suggestion / Issue</div>
+                    <div class="col-span-1 p-2 text-center border-r border-indigo-700">Voting</div>
+                    <div class="col-span-2 p-2 pl-4">Official MSG Reply</div>
+                </div>
+            `;
+            
+            data.forEach((thread, index) => {
+                const threadId = thread['Feedback ID'];
+                const upvotes = parseInt(thread['👍 TOTAL VOTES']) || 0;
+                const downvotes = parseInt(thread['👎 TOTAL DOWNVOTES']) || 0;
+                
+                const isEvenRow = index % 2 === 0;
+                const rowClass = isEvenRow ? 'bg-white' : 'bg-gray-50';
+
+                const upvoteLink = createFormLink(
+                    LIVE_UPVOTE_FORM_URL,
+                    threadId,
+                    `👍 (${upvotes})`,
+                    'bg-green-100 text-green-800 hover:bg-green-200'
+                );
+
+                const downvoteLink = createFormLink(
+                    LIVE_DOWNVOTE_FORM_URL,
+                    threadId,
+                    `👎 (${downvotes})`,
+                    'bg-red-100 text-red-800 hover:bg-red-200'
+                );
+
+                const rowHtml = `
+                    <!-- ROW: Grid Container -->
+                    <div class="data-grid-wrapper grid grid-cols-8 items-stretch text-sm border-b border-gray-100 hover:bg-indigo-50 transition duration-150 ease-in-out ${rowClass}">
+                        
+                        <!-- COLUMN 1: ID / Course (2/8 parts) -->
+                        <div class="col-span-2 text-indigo-900 font-semibold border-r border-gray-200 flex flex-col justify-center">
+                            <div class="p-2 pl-4">
+                                <span class="text-xs text-gray-500 font-normal block">ID: ${threadId}</span>
+                                <span class="text-md font-medium">${thread['Course']}</span>
+                            </div>
+                        </div>
+
+                        <!-- COLUMN 2: Suggestion/Issue (3/8 parts) -->
+                        <div class="col-span-3 text-gray-700 border-r border-gray-200">
+                            <p class="grid-cell-content whitespace-pre-wrap">${thread['Your Suggestion/Issue']}</p>
+                        </div>
+                        
+                        <!-- COLUMN 3: Voting Actions (1/8 part) -->
+                        <div class="col-span-1 text-gray-800 border-r border-gray-200 bg-gray-50 flex flex-col items-center justify-center p-1 space-y-1">
+                            ${upvoteLink}
+                            ${downvoteLink}
+                        </div>
+                        
+                        <!-- COLUMN 4: Official Reply (2/8 parts) -->
+                        <div class="col-span-2 text-gray-800">
+                            <p class="grid-cell-content italic whitespace-pre-wrap">${thread['Official MSG Reply'] || 'Awaiting review...'}</p>
+                        </div>
+                    </div>
+                `;
+                allRowsHtml += rowHtml;
+            });
+            
+            // Inject header and all data rows
+            container.innerHTML = headerHtml + allRowsHtml;
+        }
+
+
+        // --- 4. FETCHING & INITIALIZATION ---
+
+        async function fetchFeedbackData(isManual = false) {
+            const statusDiv = document.getElementById('status-message');
+            const container = document.getElementById('data-grid-container');
+            const loadingText = document.getElementById('initial-loading');
+
+            if (loadingText) loadingText.textContent = 'Refreshing data...';
+            if (isManual) statusDiv.textContent = 'Manually refreshing data...';
+
+            try {
+                // Exponential backoff logic
+                const maxRetries = 3;
+                let response = null;
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        response = await fetch(LIVE_DATA_URL);
+                        if (response.ok) break;
+                        if (i < maxRetries - 1) {
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                        }
+                    } catch (error) {
+                        if (i < maxRetries - 1) {
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+
+                if (!response || !response.ok) {
+                    throw new Error(`HTTP error! status: ${response ? response.status : 'No response'}`);
+                }
+                
+                const csvText = await response.text();
+                const feedbackData = parseCSV(csvText);
+                
+                renderDataGrid(feedbackData);
+
+                if (isManual) {
+                    statusDiv.textContent = `Data refreshed successfully at ${new Date().toLocaleTimeString()}.`;
+                    statusDiv.classList.remove('hidden');
+                } else if (loadingText) {
+                    loadingText.style.display = 'none';
+                }
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                // Display a user-friendly error message on the page
+                if (loadingText) loadingText.style.display = 'none';
+                container.innerHTML = `<div class="p-10">
+                                            <p class="text-center text-red-600 font-bold mb-2">
+                                                ERROR: Could not load live data.
+                                            </p>
+                                            <p class="text-center text-gray-500 text-sm">
+                                                Please check the console for details and ensure the Google Sheet CSV URL is correct and published to the web.
+                                            </p>
+                                        </div>`;
+                if (statusDiv) statusDiv.classList.remove('hidden');
+            }
+        }
+
+        // Initial load and set automatic refresh
+        window.onload = () => {
+            fetchFeedbackData();
+            // Automatically refresh data every 30 seconds to show vote updates
+            setInterval(fetchFeedbackData, 30000);
+        };
+    </script>
+</body>
+</html>
