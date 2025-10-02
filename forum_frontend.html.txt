@@ -76,26 +76,25 @@
     <script>
         // --- 1. CONFIGURATION ---
 
-        // PASTE YOUR LIVE GOOGLE SHEETS CSV URL HERE
-        // (File -> Publish to the web -> Comma-separated values (.csv) format)
+        // LIVE CSV DATA URL: Your published CSV link from the '0_Filtered View' sheet
         const LIVE_DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCwS6OqZsI806ccLnNWMPDafrhr1_cvFftnl5JmsygaC1yo54VtwY-P_SIgz7EfwWgTbF9srTeTkOx/pub?gid=72186548&single=true&output=csv";
 
-        // PASTE YOUR ISOLATED PRE-FILLED FORM URL FRAGMENTS HERE
-        // URL should end right before the ID placeholder (e.g., ...entry.123456789=)
-        const LIVE_UPVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfHstlcoj2_JHOYLwJo3QTE4SyrHMAhiFPVOFLpGOMrRJ6BlA/viewform?usp=pp_url&entry.467475171="; // Sample Upvote form URL
-        const LIVE_DOWNVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfHstlcoj2_JHOYLwJo3QTE4SyrHMAhiFPVOFLpGOMrRJ6BlA/viewform?usp=pp_url&entry.786514782="; // Sample Downvote form URL
+        // LIVE UPVOTE FORM URL: The isolated pre-filled fragment for Upvote submissions
+        const LIVE_UPVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScmW7ZkSbRhL94B3XlcA8hz0WVuPzqgBcgOmXwTqKXOESrT2Q/viewform?usp=pp_url&entry.467475171="; 
 
-        // Maps the column headers from your filtered sheet (0_Filtered View) to friendly keys.
-        // This is based on the final query order: (D, B, C, E, F, G, H, I)
+        // LIVE DOWNVOTE FORM URL: The isolated pre-filled fragment for Downvote submissions
+        const LIVE_DOWNVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfHstlcoj2_JHOYLwJo3QTE4SyrHMAhiFPVOFLpGOMrRJ6BlA/viewform?usp=pp_url&entry.786514782="; 
+
+        // Maps the column headers from your QUERY (D, B, C, E, F, G, H, I) to friendly keys.
         const COLUMN_MAP = {
-            'Feedback ID': 0, // Column D in Source
-            'Course': 1,      // Column B in Source
-            'Your Suggestion/Issue': 2, // Column C in Source
-            '👍 TOTAL VOTES': 3, // Column E in Source
-            '👎 TOTAL DOWNVOTES': 4, // Column F in Source
-            'Official MSG Reply': 5, // Column G in Source
-            'Click to Upvote': 6,    // Column H in Source (The raw URL string)
-            'Click to Downvote': 7,  // Column I in Source (The raw URL string)
+            'Feedback ID': 0, 
+            'Course': 1,      
+            'Your Suggestion/Issue': 2, 
+            '👍 TOTAL VOTES': 3, 
+            '👎 TOTAL DOWNVOTES': 4, 
+            'Official MSG Reply': 5, 
+            'Click to Upvote': 6,    
+            'Click to Downvote': 7,  
         };
         
         // --- 2. DATA UTILITIES ---
@@ -115,7 +114,7 @@
                 const values = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(val => val.trim().replace(/['"]+/g, ''));
                 let entry = {};
                 
-                // Map the data based on the position expected in the COLUMN_MAP (which is based on the QUERY order)
+                // Map the data based on the position expected in the COLUMN_MAP
                 for (const key in COLUMN_MAP) {
                     const index = COLUMN_MAP[key];
                     entry[key] = values[index] || '';
@@ -135,12 +134,10 @@
          * @returns {string} - HTML string for the button link.
          */
         function createFormLink(urlFragment, feedbackId, label, tailwindClass) {
-            // Concatenate the URL fragment with the ID and append the submit flag
-            // This is necessary because the query pulled the fragment, not the full link function.
+            // This is the key fix: concatenate the base URL (ending with =) and the ID
             const fullUrl = `${urlFragment}${feedbackId}`; 
             
-            // Note: We use window.open('_blank') to ensure the user stays on the Google Site 
-            // after the vote submission is complete, as the form opens in a new tab.
+            // We use target="_blank" to open the vote form in a new tab
             return `<a href="${fullUrl}" target="_blank" class="${tailwindClass} text-xs font-bold transition duration-150 ease-in-out">
                         ${label}
                     </a>`;
@@ -162,19 +159,27 @@
                 return;
             }
 
+            // Sort by vote count (optional, but good practice for popular feedback)
+            data.sort((a, b) => (parseInt(b['👍 TOTAL VOTES']) || 0) - (parseInt(a['👍 TOTAL VOTES']) || 0));
+
             data.forEach(thread => {
                 const threadId = thread['Feedback ID'];
+                
+                // Ensure vote counts are numbers, defaulting to 0
+                const upvotes = parseInt(thread['👍 TOTAL VOTES']) || 0;
+                const downvotes = parseInt(thread['👎 TOTAL DOWNVOTES']) || 0;
+                
                 const upvoteLink = createFormLink(
                     LIVE_UPVOTE_FORM_URL,
                     threadId,
-                    `👍 Upvote (${thread['👍 TOTAL VOTES']})`,
+                    `👍 Upvote (${upvotes})`,
                     'bg-green-100 text-green-800 hover:bg-green-200 px-3 py-1 rounded-full mr-2 shadow-sm'
                 );
 
                 const downvoteLink = createFormLink(
                     LIVE_DOWNVOTE_FORM_URL,
                     threadId,
-                    `👎 Downvote (${thread['👎 TOTAL DOWNVOTES']})`,
+                    `👎 Downvote (${downvotes})`,
                     'bg-red-100 text-red-800 hover:bg-red-200 px-3 py-1 rounded-full shadow-sm'
                 );
 
@@ -190,7 +195,7 @@
                             <p class="text-sm text-gray-600 italic">Posted via Anonymous Form</p>
                             
                             <!-- Voting Action -->
-                            <div class="mt-3 flex space-x-2">
+                            <div class="mt-3 flex flex-wrap gap-2">
                                 ${upvoteLink}
                                 ${downvoteLink}
                             </div>
@@ -199,7 +204,7 @@
                         <!-- Right Column: Feedback and Official Reply -->
                         <div class="md:w-3/4 md:pl-4">
                             <h3 class="text-md font-medium text-gray-700 mb-2">Student Feedback:</h3>
-                            <p class="text-gray-800 mb-4">${thread['Your Suggestion/Issue']}</p>
+                            <p class="text-gray-800 mb-4 whitespace-pre-line">${thread['Your Suggestion/Issue']}</p>
 
                             <!-- Official MSG Reply (Simulated Threaded Response) -->
                             <div class="reply-box p-3 rounded-lg shadow-inner">
@@ -218,10 +223,6 @@
 
         // --- 4. FETCHING & INITIALIZATION ---
 
-        /**
-         * Fetches data from the published Google Sheet CSV URL.
-         * @param {boolean} isManual - If true, displays a manual refresh message.
-         */
         async function fetchFeedbackData(isManual = false) {
             const statusDiv = document.getElementById('status-message');
             const container = document.getElementById('feedback-container');
@@ -231,14 +232,6 @@
             if (isManual) statusDiv.textContent = 'Manually refreshing data...';
 
             try {
-                // Check for placeholder URLs
-                if (LIVE_DATA_URL.includes("PASTE_CSV_URL_HERE")) {
-                    throw new Error("Please update the LIVE_DATA_URL variable in the script!");
-                }
-                if (LIVE_UPVOTE_FORM_URL.includes("PASTE_UPVOTE_URL_FRAGMENT_HERE") || LIVE_DOWNVOTE_FORM_URL.includes("PASTE_DOWNVOTE_URL_FRAGMENT_HERE")) {
-                    console.warn("Using placeholder form URLs. Voting links may not work.");
-                }
-
                 const response = await fetch(LIVE_DATA_URL);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -258,8 +251,13 @@
 
             } catch (error) {
                 console.error("Error fetching data:", error);
-                container.innerHTML = `<p class="text-center text-red-600 p-10 font-bold">ERROR: ${error.message}</p>
-                                     <p class="text-center text-gray-500">Please check the network tab or verify the LIVE_DATA_URL in the script.</p>`;
+                // Display a user-friendly error message on the page
+                container.innerHTML = `<p class="text-center text-red-600 p-10 font-bold">
+                                         ERROR: Could not load live data.
+                                       </p>
+                                       <p class="text-center text-gray-500">
+                                         Please ensure the Google Sheet CSV URL is correct and published to the web.
+                                       </p>`;
                 if (statusDiv) statusDiv.classList.remove('hidden');
             }
         }
