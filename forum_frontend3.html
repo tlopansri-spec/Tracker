@@ -19,7 +19,7 @@
         
         /* The main container for the table view */
         .grid-container {
-            max-height: 80vh; /* Limit height for scrolling */
+            max-height: 80vh; /* Limit height for scrolling on desktop */
             overflow-y: auto;
             width: 100%;
         }
@@ -29,13 +29,16 @@
             width: 100%;
         }
 
-        /* Style for individual grid cells */
+        /* Style for individual grid cells on desktop/tablet view */
         .grid-cell-content {
-            /* Ensures text wraps but max-height keeps the row contained */
+            padding: 0.75rem 0.5rem;
+            line-height: 1.4;
+        }
+
+        /* Custom scrollbar for desktop to keep cells uniform, only visible on desktop */
+        .grid-cell-content-desktop {
             max-height: 90px; 
             overflow-y: auto;
-            padding: 0.75rem 0.5rem; /* Increased vertical padding */
-            line-height: 1.4;
         }
 
         /* Style for the sticky header */
@@ -50,6 +53,13 @@
             background-color: #f7f9fc; /* Very subtle grey/blue tint */
         }
 
+        /* Mobile Card Styling */
+        .mobile-card {
+            border-left: 5px solid #3b82f6; /* Blue accent stripe */
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
     </style>
 </head>
 <body class="antialiased">
@@ -57,17 +67,16 @@
     <!-- Header Section -->
     <header class="header-bg p-6 shadow-xl">
         <div class="container mx-auto">
+            <!-- Removed the subheader/description text here -->
             <h1 class="text-3xl font-extrabold text-white">Curriculum Feedback Forum</h1>
-            <p class="text-base text-indigo-200 mt-1">Structured oversight of student feedback and official responses.</p>
         </div>
     </header>
 
     <!-- Main Content Container -->
     <main class="container mx-auto p-4 md:p-8">
 
-        <!-- Status and Actions -->
-        <div class="flex justify-between items-center mb-4 border-b-2 border-gray-200 pb-2">
-            <h2 class="text-2xl font-semibold text-gray-800">Feedback Data Grid</h2>
+        <!-- Status and Actions (Removed "Feedback Data Grid" title, reduced margin/padding) -->
+        <div class="flex justify-end items-center mb-2 pb-0">
             <button onclick="fetchFeedbackData(true)" class="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-md">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -76,11 +85,11 @@
             </button>
         </div>
 
-        <div id="status-message" class="bg-indigo-100 text-indigo-800 p-3 rounded-lg shadow-md mb-6 hidden">
+        <div id="status-message" class="bg-indigo-100 text-indigo-800 p-3 rounded-lg shadow-md mb-2 hidden">
             Data loading...
         </div>
         
-        <!-- Data Grid Container (Will fit content horizontally) -->
+        <!-- Data Grid Container (Responsive switch to cards on mobile) -->
         <div id="data-grid-container" class="bg-white rounded-xl shadow-lg grid-container">
             <div id="initial-loading" class="text-center p-10 text-gray-500">Loading feedback data...</div>
             <!-- Data rows will be injected here -->
@@ -124,7 +133,6 @@
             if (rows.length === 0) return [];
 
             // The header row is the first row.
-            // NOTE: We rely on the fixed order defined in COLUMN_MAP since dynamic CSV headers can be complex.
             const data = rows.slice(1).map(row => {
                 // Split by comma, handling commas inside quotes for complex strings
                 const values = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(val => val.trim().replace(/['"]+/g, ''));
@@ -146,16 +154,17 @@
          */
         function createFormLink(urlFragment, feedbackId, label, tailwindClass) {
             const fullUrl = `${urlFragment}${feedbackId}`;
-            return `<a href="${fullUrl}" target="_blank" class="${tailwindClass} text-xs sm:text-sm font-bold transition duration-150 ease-in-out w-full text-center py-1 rounded-md shadow-sm">
+            // Increased text size and padding for better touch targets on mobile
+            return `<a href="${fullUrl}" target="_blank" class="${tailwindClass} text-sm font-bold transition duration-150 ease-in-out w-full py-2 rounded-lg shadow-sm">
                         ${label}
                     </a>`;
         }
 
 
-        // --- 3. RENDERING (New Grid/Table Format with 10 Columns) ---
+        // --- 3. RENDERING (Responsive Grid/Card Format) ---
 
         /**
-         * Renders the feedback data in an Excel-like grid structure.
+         * Renders the feedback data in an Excel-like grid structure (desktop) or stacked cards (mobile).
          * @param {Array<Object>} data - Array of feedback objects.
          */
         function renderDataGrid(data) {
@@ -172,10 +181,9 @@
 
             let allRowsHtml = '';
 
-            // --- Grid Header (Sticky Row) ---
-            // New grid distribution (10 parts total): 2 (ID/Course) + 4 (Suggestion) + 1 (Voting) + 3 (Reply)
+            // --- Grid Header (Sticky Row - Hidden on Mobile) ---
             const headerHtml = `
-                <div class="data-grid-wrapper grid grid-cols-10 text-xs font-semibold uppercase text-white bg-indigo-900 grid-header shadow-md">
+                <div class="data-grid-wrapper hidden sm:grid grid-cols-10 text-xs font-semibold uppercase text-white bg-indigo-900 grid-header shadow-md">
                     <div class="col-span-2 p-3 pl-4 border-r border-indigo-800">Course / ID</div>
                     <div class="col-span-4 p-3 pl-4 border-r border-indigo-800">Student Suggestion / Issue</div>
                     <div class="col-span-1 p-3 text-center border-r border-indigo-800">Voting</div>
@@ -189,48 +197,50 @@
                 const downvotes = parseInt(thread['👎 TOTAL DOWNVOTES']) || 0;
                 
                 const isEvenRow = index % 2 === 0;
-                const rowClass = isEvenRow ? 'bg-white' : 'bg-gray-50';
+                const rowClassDesktop = isEvenRow ? 'bg-white' : 'bg-gray-50';
 
                 const upvoteLink = createFormLink(
                     LIVE_UPVOTE_FORM_URL,
                     threadId,
-                    `👍 (${upvotes})`,
+                    `👍 Upvote (${upvotes})`,
                     'bg-green-100 text-green-800 hover:bg-green-200'
                 );
 
                 const downvoteLink = createFormLink(
                     LIVE_DOWNVOTE_FORM_URL,
                     threadId,
-                    `👎 (${downvotes})`,
+                    `👎 Downvote (${downvotes})`,
                     'bg-red-100 text-red-800 hover:bg-red-200'
                 );
 
                 const rowHtml = `
-                    <!-- ROW: Grid Container -->
-                    <div class="data-grid-wrapper grid grid-cols-10 items-stretch text-sm border-b border-gray-100 hover:bg-indigo-50 transition duration-150 ease-in-out ${rowClass}">
+                    <!-- ROW: The container switches from a block (mobile) to a grid (sm: and up) -->
+                    <div class="data-grid-wrapper block sm:grid grid-cols-10 items-stretch text-sm border-b border-gray-100 hover:bg-indigo-50 transition duration-150 ease-in-out sm:${rowClassDesktop} mobile-card sm:mobile-card-0">
                         
-                        <!-- COLUMN 1: ID / Course (2/10 parts) - Widened to ensure ID is fully visible -->
-                        <div class="col-span-2 text-indigo-900 font-semibold border-r border-gray-200 flex flex-col justify-center">
-                            <div class="p-2 pl-4">
+                        <!-- COLUMN 1: ID / Course (Mobile: Header Card, Desktop: 2/10) -->
+                        <div class="sm:col-span-2 text-indigo-900 font-semibold border-r border-gray-200 flex flex-col justify-center p-2 pl-4 sm:p-0 sm:pr-0 border-b sm:border-b-0">
+                            <div class="sm:p-2 sm:pl-4">
                                 <span class="text-xs text-gray-500 font-normal block">ID: ${threadId}</span>
                                 <span class="text-md font-medium">${thread['Course']}</span>
                             </div>
                         </div>
 
-                        <!-- COLUMN 2: Suggestion/Issue (4/10 parts) -->
-                        <div class="col-span-4 text-gray-700 border-r border-gray-200">
-                            <p class="grid-cell-content whitespace-pre-wrap">${thread['Your Suggestion/Issue']}</p>
+                        <!-- COLUMN 2: Suggestion/Issue (Mobile: Section, Desktop: 4/10) -->
+                        <div class="sm:col-span-4 text-gray-700 border-r border-gray-200 border-t sm:border-t-0">
+                            <h4 class="text-xs uppercase text-gray-500 font-bold mt-3 sm:hidden px-4">Student Suggestion:</h4>
+                            <p class="grid-cell-content whitespace-pre-wrap sm:grid-cell-content-desktop">${thread['Your Suggestion/Issue']}</p>
                         </div>
                         
-                        <!-- COLUMN 3: Voting Actions (1/10 part) - Touch targets are increased via JavaScript styling -->
-                        <div class="col-span-1 text-gray-800 border-r border-gray-200 voting-accent flex flex-col items-center justify-center p-1 space-y-1">
+                        <!-- COLUMN 3: Voting Actions (Mobile: Action Block, Desktop: 1/10) -->
+                        <div class="sm:col-span-1 text-gray-800 border-r border-gray-200 voting-accent flex flex-row sm:flex-col items-center justify-center p-3 sm:p-1 space-x-2 sm:space-x-0 sm:space-y-1 border-t">
                             ${upvoteLink}
                             ${downvoteLink}
                         </div>
                         
-                        <!-- COLUMN 4: Official Reply (3/10 parts) -->
-                        <div class="col-span-3 text-gray-800">
-                            <p class="grid-cell-content italic whitespace-pre-wrap">${thread['Official MSG Reply'] || 'Awaiting review...'}</p>
+                        <!-- COLUMN 4: Official Reply (Mobile: Section, Desktop: 3/10) -->
+                        <div class="sm:col-span-3 text-gray-800 border-t sm:border-t-0">
+                            <h4 class="text-xs uppercase text-gray-500 font-bold mt-3 sm:hidden px-4">Official MSG Reply:</h4>
+                            <p class="grid-cell-content italic whitespace-pre-wrap sm:grid-cell-content-desktop">${thread['Official MSG Reply'] || 'Awaiting review...'}</p>
                         </div>
                     </div>
                 `;
