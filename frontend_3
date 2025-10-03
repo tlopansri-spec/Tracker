@@ -121,8 +121,13 @@
     <script>
         // --- 1. CONFIGURATION & STATE ---
         const LIVE_DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCwS6OqZsI806ccLnNWMPDafrhr1_cvFftnl5JmsygaC1yo54VtwY-P_SIgz7EfwWgTbF9srTeTkOx/pub?gid=72186548&single=true&output=csv";
-        const LIVE_UPVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScmW7ZkSbRhL94B3XlcA8hz0WVuPzqgBcgOmXwTqKXOESrT2Q/viewform?usp=pp_url&entry.467475171=";
-        const LIVE_DOWNVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfHstlcoj2_JHOYLwJo3QTE4SyrHMAhiFPVOFLpGOMrRJ6BlA/viewform?usp=pp_url&entry.786514782=";
+        
+        // UPDATED UPVOTE LINK
+        const LIVE_UPVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScmW7ZkSbRhL94B3XlcA8hz0WVuPzqgBcgOmXwTqKXOESrT2Q/viewform?usp=dialog&entry.467475171=";
+        
+        // UPDATED DOWNVOTE LINK
+        const LIVE_DOWNVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfHstlcoj2_JHOYLwJo3QTE4SyrHMAhiFPVOFLpGOMrRJ6BlA/viewform?usp=sharing&ouid=109301352960459922275&entry.786514782=";
+        
         const COLUMN_MAP = {
             'Feedback ID': 0, 'Course': 1, 'Your Suggestion/Issue': 2,
             '👍 TOTAL VOTES': 3, '👎 TOTAL DOWNVOTES': 4, 'Official MSG Reply': 5,
@@ -147,6 +152,7 @@
         }
 
         function createFormLink(urlFragment, feedbackId, label, tailwindClass) {
+            // Note: The feedbackId is appended here to pre-fill the form entry field.
             const fullUrl = `${urlFragment}${feedbackId}`;
             return `<a href="${fullUrl}" target="_blank" class="${tailwindClass} text-sm font-bold transition duration-150 ease-in-out w-full py-2 rounded-lg shadow-sm">
                         ${label}
