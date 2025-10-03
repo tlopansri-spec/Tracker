@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curriculum Feedback Forum</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Styles for professional aesthetic */
+        body {
+            /* Using the standard professional font Inter */
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Lighter, cleaner background */
+        }
+        .header-bg {
+            background-color: #1a2b4f; /* Deep, authoritative navy blue */
+        }
+        
+        /* The main container for the table view (Desktop Grid) */
+        .grid-container {
+            max-height: 80vh; /* Limit height for scrolling on desktop */
+            overflow-y: auto;
+            width: 100%;
+        }
+
+        /* Enforce 100% width for the grid wrapper */
+        .data-grid-wrapper {
+            width: 100%;
+        }
+
+        /* Style for individual grid cells on desktop/tablet view */
+        .grid-cell-content {
+            padding: 0.75rem 0.5rem;
+            line-height: 1.4;
+        }
+
+        /* Custom scrollbar for desktop to keep cells uniform, only visible on desktop */
+        .grid-cell-content-desktop {
+            max-height: 90px; 
+            overflow-y: auto;
+        }
+
+        /* Style for the sticky header */
+        .grid-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        /* Accent color for the voting column */
+        .voting-accent {
+            background-color: #f7f9fc; /* Very subtle grey/blue tint */
+        }
+
+        /* Mobile Card Styling for the List View */
+        .phone-list-card {
+            transition: background-color 0.15s;
+        }
+        .phone-list-card:hover {
+            background-color: #e0f2fe; /* Light blue on hover */
+        }
+        
+        /* Utility to hide/show elements */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header Section -->
+    <header class="header-bg p-6 shadow-xl">
+        <div class="container mx-auto">
+            <h1 class="text-3xl font-extrabold text-white">Curriculum Feedback Forum</h1>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="container mx-auto p-4 md:p-8">
+
+        <!-- Status and Actions: Contains Refresh and View Toggles -->
+        <div class="flex flex-wrap justify-between items-center mb-2 pb-0 space-y-2 md:space-y-0">
+            <!-- Left Group: Refresh Button -->
+            <button onclick="fetchFeedbackData(true)" class="bg-gray-200 text-gray-700 hover:bg-gray-300 px-4 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-sm w-full sm:w-auto order-last md:order-first">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh Data
+            </button>
+            
+            <!-- Right Group: View Toggles -->
+            <div class="flex space-x-2 w-full sm:w-auto order-first md:order-last">
+                <button id="grid-view-toggle" onclick="switchToView('grid')" class="px-3 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-md">
+                    Laptop/iPad View
+                </button>
+                <button id="phone-view-toggle" onclick="switchToView('list')" class="px-3 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-md">
+                    Phone Friendly View
+                </button>
+            </div>
+        </div>
+
+        <div id="status-message" class="bg-indigo-100 text-indigo-800 p-3 rounded-lg shadow-md mb-2 hidden">
+            Data loading...
+        </div>
+        
+        <!-- --- 1. LAPTOP/IPAD GRID VIEW CONTAINER (Default) --- -->
+        <div id="grid-view-container" class="bg-white rounded-xl shadow-lg grid-container">
+            <div id="initial-loading-grid" class="text-center p-10 text-gray-500">Loading feedback data...</div>
+            <!-- Data rows will be injected here -->
+        </div>
+
+        <!-- --- 2. PHONE FRIENDLY VIEW CONTAINER (Initially Hidden) --- -->
+        <div id="phone-view-container" class="bg-white rounded-xl shadow-lg p-4 hidden">
+            <!-- Content dynamically changes between 'list', 'detail', and 'reply' views -->
+            <div id="phone-content"></div>
+        </div>
+    </main>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 1. CONFIGURATION & STATE ---
+        const LIVE_DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQCwS6OqZsI806ccLnNWMPDafrhr1_cvFftnl5JmsygaC1yo54VtwY-P_SIgz7EfwWgTbF9srTeTkOx/pub?gid=72186548&single=true&output=csv";
+        const LIVE_UPVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScmW7ZkSbRhL94B3XlcA8hz0WVuPzqgBcgOmXwTqKXOESrT2Q/viewform?usp=pp_url&entry.467475171=";
+        const LIVE_DOWNVOTE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfHstlcoj2_JHOYLwJo3QTE4SyrHMAhiFPVOFLpGOMrRJ6BlA/viewform?usp=pp_url&entry.786514782=";
+        const COLUMN_MAP = {
+            'Feedback ID': 0, 'Course': 1, 'Your Suggestion/Issue': 2,
+            '👍 TOTAL VOTES': 3, '👎 TOTAL DOWNVOTES': 4, 'Official MSG Reply': 5,
+            'Click to Upvote': 6, 'Click to Downvote': 7,
+        };
+
+        let currentView = 'grid'; // State: 'grid', 'list', or 'detail'
+        let selectedThreadId = null;
+        let allFeedbackData = [];
+        
+        // --- 2. UTILITIES ---
+        function parseCSV(csvText) {
+            const rows = csvText.trim().split('\n');
+            if (rows.length === 0) return [];
+            const data = rows.slice(1).map(row => {
+                const values = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(val => val.trim().replace(/['"]+/g, ''));
+                let entry = {};
+                for (const key in COLUMN_MAP) { entry[key] = values[COLUMN_MAP[key]] || ''; }
+                return entry;
+            }).filter(entry => entry['Course']);
+            return data;
+        }
+
+        function createFormLink(urlFragment, feedbackId, label, tailwindClass) {
+            const fullUrl = `${urlFragment}${feedbackId}`;
+            return `<a href="${fullUrl}" target="_blank" class="${tailwindClass} text-sm font-bold transition duration-150 ease-in-out w-full py-2 rounded-lg shadow-sm">
+                        ${label}
+                    </a>`;
+        }
+
+        // --- 3. VIEW SWITCHING & ORCHESTRATION ---
+        
+        /** Switches the application view state and renders the appropriate content. */
+        function switchToView(view, id = null) {
+            currentView = view;
+            selectedThreadId = id;
+
+            const gridContainer = document.getElementById('grid-view-container');
+            const phoneContainer = document.getElementById('phone-view-container');
+            const gridToggle = document.getElementById('grid-view-toggle');
+            const phoneToggle = document.getElementById('phone-view-toggle');
+
+            // Update button styles
+            if (currentView === 'grid') {
+                gridContainer.classList.remove('hidden');
+                phoneContainer.classList.add('hidden');
+                gridToggle.className = 'bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-md';
+                phoneToggle.className = 'bg-gray-200 text-gray-700 hover:bg-gray-300 px-3 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-md';
+                renderGridView(allFeedbackData); // Ensure grid is rendered when switched to
+            } else {
+                gridContainer.classList.add('hidden');
+                phoneContainer.classList.remove('hidden');
+                gridToggle.className = 'bg-gray-200 text-gray-700 hover:bg-gray-300 px-3 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-md';
+                phoneToggle.className = 'bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition duration-150 shadow-md';
+                renderPhoneView(allFeedbackData); // Render list or detail view
+            }
+        }
+
+        /** Main rendering function called after data is loaded. */
+        function renderApp(data) {
+            allFeedbackData = data;
+            // Based on the current state, render the corresponding view
+            if (currentView === 'grid') {
+                renderGridView(allFeedbackData);
+            } else {
+                renderPhoneView(allFeedbackData);
+            }
+            // Ensure initial toggle state is set
+            switchToView(currentView);
+        }
+
+        // --- 4. DESKTOP/IPAD GRID VIEW RENDERING ---
+
+        function renderGridView(data) {
+            const container = document.getElementById('grid-view-container');
+            const loadingTextGrid = document.getElementById('initial-loading-grid');
+
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 p-10">No active feedback threads found yet.</p>';
+            } else {
+                // Show newest first
+                const sortedData = [...data].reverse(); 
+                let allRowsHtml = '';
+
+                // Grid Header (Sticky Row - Hidden on Mobile)
+                const headerHtml = `
+                    <div class="data-grid-wrapper hidden sm:grid grid-cols-10 text-xs font-semibold uppercase text-white bg-indigo-900 grid-header shadow-md">
+                        <div class="col-span-2 p-3 pl-4 border-r border-indigo-800">Course / ID</div>
+                        <div class="col-span-4 p-3 pl-4 border-r border-indigo-800">Student Suggestion / Issue</div>
+                        <div class="col-span-1 p-3 text-center border-r border-indigo-800">Voting</div>
+                        <div class="col-span-3 p-3 pl-4">Official MSG Reply</div>
+                    </div>
+                `;
+                
+                sortedData.forEach((thread, index) => {
+                    const threadId = thread['Feedback ID'];
+                    const upvotes = parseInt(thread['👍 TOTAL VOTES']) || 0;
+                    const downvotes = parseInt(thread['👎 TOTAL DOWNVOTES']) || 0;
+                    
+                    const isEvenRow = index % 2 === 0;
+                    const rowClassDesktop = isEvenRow ? 'bg-white' : 'bg-gray-50';
+
+                    const upvoteLink = createFormLink(LIVE_UPVOTE_FORM_URL, threadId, `👍 Upvote (${upvotes})`, 'bg-green-100 text-green-800 hover:bg-green-200');
+                    const downvoteLink = createFormLink(LIVE_DOWNVOTE_FORM_URL, threadId, `👎 Downvote (${downvotes})`, 'bg-red-100 text-red-800 hover:bg-red-200');
+
+                    const rowHtml = `
+                        <div class="data-grid-wrapper block sm:grid grid-cols-10 items-stretch text-sm border-b border-gray-100 hover:bg-indigo-50 transition duration-150 ease-in-out sm:${rowClassDesktop} p-4 sm:p-0">
+                            
+                            <div class="sm:col-span-2 text-indigo-900 font-semibold border-r border-gray-200 flex flex-col justify-center p-2 pl-4 sm:p-0 sm:pr-0 border-b sm:border-b-0">
+                                <div class="sm:p-2 sm:pl-4">
+                                    <span class="text-xs text-gray-500 font-normal block">ID: ${threadId}</span>
+                                    <span class="text-md font-medium">${thread['Course']}</span>
+                                </div>
+                            </div>
+
+                            <div class="sm:col-span-4 text-gray-700 border-r border-gray-200 border-t sm:border-t-0">
+                                <h4 class="text-xs uppercase text-gray-500 font-bold mt-3 sm:hidden px-4">Student Suggestion:</h4>
+                                <p class="grid-cell-content whitespace-pre-wrap sm:grid-cell-content-desktop">${thread['Your Suggestion/Issue']}</p>
+                            </div>
+                            
+                            <div class="sm:col-span-1 text-gray-800 border-r border-gray-200 voting-accent flex flex-row sm:flex-col items-center justify-center p-3 sm:p-1 space-x-2 sm:space-x-0 sm:space-y-1 border-t">
+                                ${upvoteLink}
+                                ${downvoteLink}
+                            </div>
+                            
+                            <div class="sm:col-span-3 text-gray-800 border-t sm:border-t-0">
+                                <h4 class="text-xs uppercase text-gray-500 font-bold mt-3 sm:hidden px-4">Official MSG Reply:</h4>
+                                <p class="grid-cell-content italic whitespace-pre-wrap sm:grid-cell-content-desktop">${thread['Official MSG Reply'] || 'Awaiting review...'}</p>
+                            </div>
+                        </div>
+                    `;
+                    allRowsHtml += rowHtml;
+                });
+                
+                container.innerHTML = headerHtml + allRowsHtml;
+            }
+            
+            // --- FIX APPLIED HERE: Check if loadingTextGrid exists before accessing classList ---
+            if (loadingTextGrid) {
+                loadingTextGrid.classList.add('hidden');
+            }
+        }
+
+
+        // --- 5. PHONE FRIENDLY VIEW RENDERING ---
+
+        function renderPhoneView(data) {
+            const phoneContentDiv = document.getElementById('phone-content');
+            
+            if (currentView === 'list') {
+                renderPhoneList(data, phoneContentDiv);
+            } else if (currentView === 'detail') {
+                renderPhoneDetail(data, phoneContentDiv, selectedThreadId);
+            }
+        }
+
+        function renderPhoneList(data, container) {
+            // Show newest first
+            const sortedData = [...data].reverse(); 
+            
+            let listHtml = `
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Select Feedback Thread</h3>
+                <div class="space-y-2">
+            `;
+            
+            if (sortedData.length === 0) {
+                 listHtml += '<p class="text-center text-gray-500 p-10">No active feedback threads found yet.</p>';
+            } else {
+                sortedData.forEach(thread => {
+                    listHtml += `
+                        <div onclick="switchToView('detail', '${thread['Feedback ID']}')" 
+                             class="phone-list-card bg-white p-3 border-l-4 border-indigo-400 rounded-lg shadow-sm cursor-pointer border hover:border-indigo-600">
+                            <p class="text-sm font-semibold text-indigo-800">${thread['Course']} - ${thread['Feedback ID']}</p>
+                            <p class="text-xs text-gray-600 mt-1 truncate">${thread['Your Suggestion/Issue']}</p>
+                        </div>
+                    `;
+                });
+            }
+            
+            listHtml += '</div>';
+            container.innerHTML = listHtml;
+        }
+
+        function renderPhoneDetail(data, container, id) {
+            const thread = data.find(t => t['Feedback ID'] === id);
+            if (!thread) {
+                container.innerHTML = `<p class="text-red-600">Error: Thread ID ${id} not found.</p>`;
+                return;
+            }
+
+            const upvotes = parseInt(thread['👍 TOTAL VOTES']) || 0;
+            const downvotes = parseInt(thread['👎 TOTAL DOWNVOTES']) || 0;
+
+            const upvoteLink = createFormLink(LIVE_UPVOTE_FORM_URL, id, `👍 Upvote (${upvotes})`, 'bg-green-100 text-green-800 hover:bg-green-200');
+            const downvoteLink = createFormLink(LIVE_DOWNVOTE_FORM_URL, id, `👎 Downvote (${downvotes})`, 'bg-red-100 text-red-800 hover:bg-red-200');
+
+            const hasReply = !!thread['Official MSG Reply'];
+
+            const detailHtml = `
+                <!-- Back Button -->
+                <button onclick="switchToView('list')" class="flex items-center text-indigo-600 hover:text-indigo-800 mb-4 font-semibold">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Back to List
+                </button>
+
+                <h3 class="text-xl font-extrabold text-indigo-900 mb-2">${thread['Course']} - ID: ${id}</h3>
+                
+                <!-- Student Suggestion -->
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-inner mb-4">
+                    <p class="text-sm uppercase text-gray-500 font-bold mb-1">Student Suggestion/Issue:</p>
+                    <p class="text-gray-800 whitespace-pre-wrap">${thread['Your Suggestion/Issue']}</p>
+                </div>
+
+                <!-- Voting Actions -->
+                <div class="flex space-x-3 mb-6">
+                    ${upvoteLink}
+                    ${downvoteLink}
+                </div>
+
+                <!-- Official Reply Section -->
+                <div id="reply-container">
+                    <button onclick="document.getElementById('msg-reply-content').classList.toggle('hidden')" 
+                            class="w-full text-center py-3 rounded-lg font-bold transition duration-150 ${hasReply ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-200 text-gray-500 cursor-default'}">
+                        ${hasReply ? 'View Official MSG Reply' : 'Awaiting Official Reply...'}
+                    </button>
+                    
+                    <div id="msg-reply-content" class="bg-teal-50 p-4 rounded-lg mt-4 border border-teal-200 hidden">
+                        <p class="text-sm uppercase text-purple-700 font-bold mb-1">Official Response:</p>
+                        <p class="text-gray-700 whitespace-pre-wrap">${thread['Official MSG Reply']}</p>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = detailHtml;
+        }
+
+
+        // --- 6. FETCHING & INITIALIZATION ---
+
+        async function fetchFeedbackData(isManual = false) {
+            const statusDiv = document.getElementById('status-message');
+            // Get element reference safely here
+            const loadingTextGrid = document.getElementById('initial-loading-grid'); 
+
+            if (loadingTextGrid) loadingTextGrid.textContent = 'Refreshing data...';
+            if (isManual) statusDiv.textContent = 'Manually refreshing data...';
+
+            try {
+                // Exponential backoff logic
+                const maxRetries = 3;
+                let response = null;
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        response = await fetch(LIVE_DATA_URL);
+                        if (response.ok) break;
+                        if (i < maxRetries - 1) {
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                        }
+                    } catch (error) {
+                        if (i < maxRetries - 1) {
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+
+                if (!response || !response.ok) {
+                    throw new Error(`HTTP error! status: ${response ? response.status : 'No response'}`);
+                }
+                
+                const csvText = await response.text();
+                const feedbackData = parseCSV(csvText);
+                
+                renderApp(feedbackData); // Render both views from the same data
+
+                if (isManual) {
+                    statusDiv.textContent = `Data refreshed successfully at ${new Date().toLocaleTimeString()}.`;
+                    statusDiv.classList.remove('hidden');
+                } 
+                // We no longer need to hide it here, as renderGridView handles it successfully
+                // else if (loadingTextGrid) {
+                //     loadingTextGrid.classList.add('hidden');
+                // }
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                // Display a user-friendly error message on the page
+                // --- FIX APPLIED HERE: Check if loadingTextGrid exists before accessing classList ---
+                if (loadingTextGrid) {
+                    loadingTextGrid.classList.add('hidden');
+                }
+                document.getElementById('grid-view-container').innerHTML = `<div class="p-10 text-center">
+                                            <p class="text-red-600 font-bold mb-2">ERROR: Could not load live data.</p>
+                                            <p class="text-gray-500 text-sm">Please check the console for details and ensure the Google Sheet CSV URL is correct and published to the web.</p>
+                                        </div>`;
+                if (statusDiv) statusDiv.classList.remove('hidden');
+            }
+        }
+
+        // Initial load and set automatic refresh
+        window.onload = () => {
+            fetchFeedbackData();
+            // Automatically refresh data every 30 seconds to show vote updates
+            setInterval(fetchFeedbackData, 30000);
+        };
+    </script>
+</body>
+</html>
